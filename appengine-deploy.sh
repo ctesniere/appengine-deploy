@@ -1,36 +1,65 @@
 #!/usr/bin/env bash
 
-curl -s https://gist.githubusercontent.com/ctesniere/c34ac1e57f5c44c7fc20/raw/8bf3b40e7c9515c74235b55f1d36e4475a93ca11/mvncolor.sh | bash
+function messageError() {
+    printf "\e[31m ===> %s\e[0m\n" "$1"
+}
 
-DIRECTORY_EAR=$(ls | grep ear)
+function messageSuccess() {
+    printf "\e[32m ===> %s\e[0m\n" "$1"
+}
 
-if [ ! -f pom.xml ]; then
-	printf "\e[31m ===> pom.xml file not found\e[0m\n"
-	exit 1
-fi
-if [ "$#" -ne 1 ]; then
-	printf "\e[31m ===> Illegal number of parameters (arg1 : profil)\e[0m\n"
-	exit 1
-fi
-if [ ! -z $(echo ${PWD##*/} | grep ear) ]; then
-	printf "\e[31m ===> Current directory is ear\e[0m\n"
-	exit 1
-fi
+function appengineDeploy() {
 
-if [ -d $DIRECTORY_EAR ] && [ ! -z $DIRECTORY_EAR ]; then
-	printf "\e[32m ===> Project with a '$DIRECTORY_EAR'\e[0m\n"
-	printf "\e[32m ===> $(pwd)\e[0m\n"
-	mvn-color clean install -P $1
+    curl -s https://gist.githubusercontent.com/ctesniere/c34ac1e57f5c44c7fc20/raw/8bf3b40e7c9515c74235b55f1d36e4475a93ca11/mvncolor.sh | bash
 
-	cd $DIRECTORY_EAR
-fi
+    DIRECTORY_EAR=$(find . -d 1 | grep ear)
+    CURRENT_DIRECTORY=${PWD##*/}
 
-printf "\e[32m ===> Appengine update with $1 profil\e[0m\n"
-printf "\e[32m ===> $(pwd)\e[0m\n"
-mvn-color clean appengine:update -P $1
+    if [ ! -f pom.xml ]; then
+        messageError "pom.xml file not found"
+        return 1
 
-if [ -d $DIRECTORY_EAR ] && [ ! -z $DIRECTORY_EAR ]; then
-	cd ..
-fi
+    elif [ "$#" -eq 0 ]; then # TODO ou vide
+        messageError "Illegal number of parameters"
+        messageError "    arg1 : profil"
+        messageError "    arg2 : option of build (optional)"
+        return 1
 
-Terminal-notifier -message "Finished deployment"
+    elif [ ! -z "$(echo "$CURRENT_DIRECTORY" | grep ear)" ]; then
+        messageError "Current directory is ear" && cd .. || return 1
+        return 1
+    fi
+
+
+    if [ "$CURRENT_DIRECTORY" = "vega-is-0km" ]; then
+        messageSuccess "Compiling the front"
+        cd "./src/main/javascript/" || return 1
+        bower install && npm install && grunt
+        cd -
+    fi
+
+    if [ -d "$DIRECTORY_EAR" ] && [ ! -z "$DIRECTORY_EAR" ]; then
+        messageSuccess "Project with a '$DIRECTORY_EAR'"
+        mvn-color clean install -P "$1" "$2"
+
+        cd "$DIRECTORY_EAR" || return 1
+    fi
+
+    messageSuccess "Appengine update with $1 profil"
+    
+    # TODO : Ne pas executer ce code si le build precedent fail
+    mvn-color clean appengine:update -P "$1" "$2"
+
+    if [ -d "$DIRECTORY_EAR" ] && [ ! -z "$DIRECTORY_EAR" ]; then
+        # FIX : Le script ne rentre jamais dans cette condition
+        cd .. || return 1
+    fi
+
+    Terminal-notifier \
+        -contentImage https://cloud.google.com/images/gcp-favicon.ico \
+        -sound default \
+        -title 'Finished deployment' \
+        -subtitle "$1 profile" \
+        -group 'appengine-deploy' \
+        -message "project : $CURRENT_DIRECTORY"
+}
