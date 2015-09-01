@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 function messageError() {
     printf "\e[31m ===> %s\e[0m\n" "$1"
 }
