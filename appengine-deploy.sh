@@ -24,8 +24,10 @@ function appengineDeploy() {
         return 1
 
     elif [ ! -z "$(echo "$CURRENT_DIRECTORY" | grep ear)" ]; then
-        messageError "Current directory is ear" && cd .. || return 1
-        return 1
+        messageError "Current directory is ear"
+        cd .. || return 1
+        messageSuccess "cd .."
+        
     fi
 
 
