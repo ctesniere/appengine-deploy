@@ -10,7 +10,6 @@ function appengineDeploy() {
 
     curl -s https://gist.githubusercontent.com/ctesniere/c34ac1e57f5c44c7fc20/raw/8bf3b40e7c9515c74235b55f1d36e4475a93ca11/mvncolor.sh | bash
 
-    DIRECTORY_EAR=$(find . -d 1 | grep ear)
     CURRENT_DIRECTORY=${PWD##*/}
 
     if [ ! -f pom.xml ]; then
@@ -27,9 +26,9 @@ function appengineDeploy() {
         messageError "Current directory is ear"
         cd .. || return 1
         messageSuccess "cd .."
-        
     fi
 
+    DIRECTORY_EAR=$(find . -d 1 | grep ear)
 
     if [ "$CURRENT_DIRECTORY" = "vega-is-0km" ]; then
         messageSuccess "Compiling the front"
