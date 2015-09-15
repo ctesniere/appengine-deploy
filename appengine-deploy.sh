@@ -28,6 +28,7 @@ function appengineDeploy() {
         messageSuccess "cd .."
     fi
 
+    pwd
     DIRECTORY_EAR=$(find . -d 1 | grep ear)
 
     if [ "$CURRENT_DIRECTORY" = "vega-is-0km" ]; then
