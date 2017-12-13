@@ -1,65 +1,94 @@
-function messageError() {
-    printf "\e[31m ===> %s\e[0m\n" "$1"
+#!/bin/sh
+
+DIRECTORY_EAR=$(ls | grep ear)
+CURRENT_DIRECTORY=${PWD##*/}
+
+curl -sl https://gist.githubusercontent.com/ctesniere/2498a32304e3039152e8/raw/mvncolor.sh -o /tmp/mvncolor.sh
+source /tmp/mvncolor.sh
+
+checkDependency() {
+    if ! which brew >/dev/null; then
+        echo "Install brew ? [Y/N]"
+        read PROMPT
+
+        if echo "$PROMPT" | grep -iq "Y"; then
+            printf "\e[32m ===> brew is not installed. Installing ...\e[0m\n"
+            ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+        fi
+    fi
+
+    if which brew >/dev/null; then
+        if ! which Terminal-notifier >/dev/null; then
+            printf "\e[32m ===> terminal-notifier is not installed. Installing ...\e[0m\n"
+            brew install terminal-notifier
+        fi
+    fi
 }
 
-function messageSuccess() {
-    printf "\e[32m ===> %s\e[0m\n" "$1"
-}
-
-function appengineDeploy() {
-
-    curl -s https://gist.githubusercontent.com/ctesniere/c34ac1e57f5c44c7fc20/raw/8bf3b40e7c9515c74235b55f1d36e4475a93ca11/mvncolor.sh | bash
-
-    CURRENT_DIRECTORY=${PWD##*/}
-
+function checkPostTraitement() {
     if [ ! -f pom.xml ]; then
-        messageError "pom.xml file not found"
-        return 1
-
-    elif [ "$#" -eq 0 ]; then # TODO ou vide
-        messageError "Illegal number of parameters"
-        messageError "    arg1 : profil"
-        messageError "    arg2 : option of build (optional)"
-        return 1
-
-    elif [ ! -z "$(echo "$CURRENT_DIRECTORY" | grep ear)" ]; then
-        messageError "Current directory is ear"
-        cd .. || return 1
-        messageSuccess "cd .."
+        printError "pom.xml file not found"
+        exit
     fi
 
-    pwd
-    DIRECTORY_EAR=$(find . -d 1 | grep ear)
-
-    if [ "$CURRENT_DIRECTORY" = "vega-is-0km" ]; then
-        messageSuccess "Compiling the front"
-        cd "./src/main/javascript/" || return 1
-        bower install && npm install && grunt
-        cd -
+    if [ "$#" -ne 1 ]; then
+        printError "Illegal number of parameters (arg1 : profil)"
+        exit
     fi
 
-    if [ -d "$DIRECTORY_EAR" ] && [ ! -z "$DIRECTORY_EAR" ]; then
-        messageSuccess "Project with a '$DIRECTORY_EAR'"
-        mvn-color clean install -P "$1" "$2"
-
-        cd "$DIRECTORY_EAR" || return 1
+    if [ ! -z $(echo $CURRENT_DIRECTORY | grep ear) ]; then
+        printError "Current directory is ear"
+        exit
     fi
-
-    messageSuccess "Appengine update with $1 profil"
-    
-    # TODO : Ne pas executer ce code si le build precedent fail
-    mvn-color clean appengine:update -P "$1" "$2"
-
-    if [ -d "$DIRECTORY_EAR" ] && [ ! -z "$DIRECTORY_EAR" ]; then
-        # FIX : Le script ne rentre jamais dans cette condition
-        cd .. || return 1
-    fi
-
-    Terminal-notifier \
-        -contentImage https://cloud.google.com/images/gcp-favicon.ico \
-        -sound default \
-        -title 'Finished deployment' \
-        -subtitle "$1 profile" \
-        -group 'appengine-deploy' \
-        -message "project : $CURRENT_DIRECTORY"
 }
+
+function buildFront() {
+    printf "\e[31m ===> front\e[0m\n"
+    CURRENT_DIRECTORY=${PWD##*/}
+}
+
+function printSuccess() {
+    printf "\e[32m ===> $1 \e[0m\n"
+}
+
+function printError() {
+    printf "\e[31m ===> $1 \e[0m\n"
+}
+
+function notify() {
+    if which Terminal-notifier >/dev/null; then
+        Terminal-notifier \
+            -contentImage https://cloud.google.com/images/gcp-favicon.ico \
+            -sound default \
+            -title 'Finished deployment' \
+            -subtitle "$1 profile" \
+            -message "project : $2"
+    else
+        osascript -e 'tell app "System Events" to display dialog "Pause de 20 secondes"'
+    fi
+}
+
+checkDependency
+checkPostTraitement $@
+
+if [ -d $DIRECTORY_EAR ] && [ ! -z $DIRECTORY_EAR ]; then
+    printSuccess "Project with a directory ear ($DIRECTORY_EAR)"
+    mvncolor clean install -P $1
+
+    # TODO : Compile front in front module
+    cd $DIRECTORY_EAR
+fi
+
+printSuccess "Appengine update with $1 profil"
+
+# TODO : Ne pas executer ce code si le build precedent fail
+mvncolor clean appengine:update -P $1
+
+if [ -d $DIRECTORY_EAR ] && [ ! -z $DIRECTORY_EAR ]; then
+    # TODO : Pb le script ne rentre jamais dans cette condition
+    cd ..
+fi
+
+notify $1 $CURRENT_DIRECTORY
+
+rm /tmp/mvncolor.sh
